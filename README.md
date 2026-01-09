@@ -1,12 +1,13 @@
-# OCR API với Qwen2.5-VL 7B
+# OCR API với EasyOCR
 
-Dự án OCR sử dụng Qwen2.5-VL 7B để scan image và PDF thành text. Model chạy local với GPU support.
+Dự án OCR sử dụng EasyOCR để scan image và PDF thành text. Model chạy local với GPU support, nhanh và hiệu quả.
 
 ## Yêu cầu hệ thống
 
-- NVIDIA GPU (RTX 3050 6GB hoặc tương đương)
+- NVIDIA GPU (RTX 3050 6GB hoặc tương đương) - **Khuyến nghị**
 - Docker và Docker Compose
 - NVIDIA Docker runtime (nvidia-docker2)
+- **Lưu ý**: Có thể chạy trên CPU nhưng sẽ chậm hơn nhiều
 
 ## Cài đặt
 
@@ -42,7 +43,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-Lần đầu chạy sẽ mất thời gian để download model (~14GB).
+Lần đầu chạy sẽ mất thời gian để download model EasyOCR (~500MB cho tiếng Việt và tiếng Anh).
 
 ## Sử dụng API
 
@@ -76,8 +77,16 @@ GET http://localhost:8000/health
 {
     "success": true,
     "filename": "example.pdf",
-    "text": "Nội dung text đã được OCR...",
-    "processing_time": 2.45
+    "pages": [
+        {
+            "page": 1,
+            "method": "easyocr",
+            "text": "Nội dung text đã được OCR...",
+            "time": 2.45
+        }
+    ],
+    "total_pages": 1,
+    "processing_time": 2.5
 }
 ```
 
@@ -98,20 +107,32 @@ curl -X POST "http://localhost:8000/ocr" \
 ```
 .
 ├── app.py              # FastAPI server
-├── ocr_service.py      # OCR service với Qwen2.5-VL
+├── ocr_service.py      # OCR service với EasyOCR
 ├── requirements.txt    # Python dependencies
 ├── Dockerfile          # Docker image definition
 ├── docker-compose.yml  # Docker compose config
-└── README.md          # Documentation
+├── README.md          # Documentation
+└── QUICKSTART.md      # Quick start guide
 ```
+
+## Tính năng
+
+- ✅ OCR cho image (JPG, PNG, BMP, GIF, WebP)
+- ✅ OCR cho PDF (nhiều trang, tự động phát hiện text-based PDF)
+- ✅ Hỗ trợ tiếng Việt và tiếng Anh
+- ✅ Tự động sử dụng GPU nếu có
+- ✅ Nhanh và hiệu quả (2-5 giây/ảnh với GPU)
+- ✅ API REST với FastAPI
+- ✅ Docker containerization
 
 ## Lưu ý
 
-- Model sẽ được cache trong thư mục `./models` sau lần download đầu tiên (~14GB)
-- RTX 3050 6GB có thể xử lý được model với float16 quantization, nhưng có thể cần thời gian xử lý lâu hơn
+- Model EasyOCR sẽ được cache trong thư mục `~/.EasyOCR/` sau lần download đầu tiên (~500MB)
+- RTX 3050 6GB đủ để chạy EasyOCR với GPU, tốc độ nhanh (2-5 giây/ảnh)
 - PDF nhiều trang sẽ được xử lý từng trang một
+- PDF text-based sẽ được extract trực tiếp (không cần OCR) để tăng tốc
 - Thời gian xử lý phụ thuộc vào kích thước và độ phức tạp của file
-- Nếu gặp lỗi OOM (Out of Memory), có thể cần giảm `max_new_tokens` trong `ocr_service.py` hoặc resize image trước khi xử lý
+- Nếu không có GPU, EasyOCR sẽ tự động fallback về CPU (chậm hơn 5-10 lần)
 
 ## Troubleshooting
 
@@ -122,23 +143,35 @@ curl -X POST "http://localhost:8000/ocr" \
 - Kiểm tra trong Docker Desktop Settings > Resources > WSL Integration
 - Chạy trong WSL2 terminal:
 ```bash
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
 ```
 
 **Linux:**
 ```bash
-docker run --rm --gpus all nvidia/cuda:11.8.0-base-ubuntu22.04 nvidia-smi
+docker run --rm --gpus all nvidia/cuda:12.1.1-base-ubuntu22.04 nvidia-smi
 ```
 
-### Out of Memory
+### EasyOCR chạy chậm
 
-Nếu gặp lỗi OOM, có thể giảm batch size hoặc sử dụng CPU mode (chậm hơn).
+- Kiểm tra xem GPU có được sử dụng không: xem logs khi khởi động
+- Nếu không có GPU, EasyOCR sẽ tự động dùng CPU (chậm hơn)
+- Đảm bảo PyTorch với CUDA đã được cài đặt đúng
 
 ### Model download chậm
 
-Model sẽ được cache sau lần download đầu tiên. Có thể pre-download model trước.
+Model sẽ được cache sau lần download đầu tiên. Có thể pre-download model trước bằng cách chạy container và để nó download.
+
+### Lỗi NumPy version
+
+Nếu gặp lỗi về NumPy, đảm bảo `numpy<2.0.0` trong requirements.txt (đã được cấu hình sẵn).
+
+## Performance
+
+- **Với GPU (RTX 3050 6GB)**: ~2-5 giây/ảnh
+- **Với CPU**: ~10-30 giây/ảnh
+- **PDF text-based**: < 1 giây/trang (extract trực tiếp)
+- **PDF scan**: ~2-5 giây/trang (với GPU)
 
 ## License
 
 MIT
-
